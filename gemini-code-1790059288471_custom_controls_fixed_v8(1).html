@@ -1,0 +1,1369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Check-In Guide Builder</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- html2canvas -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        * { box-sizing: border-box; }
+        html, body { width: 100%; max-width: 100%; overflow-x: hidden; }
+        body { font-family: 'Inter', sans-serif; }
+        img { max-width: 100%; }
+        #guide-preview-wrapper { width: 100%; max-width: none !important; padding: 16px !important; border: 0 !important; box-shadow: none !important; }
+        #guide-steps-container { width: 100%; }
+        .preview-shell { width: 100%; max-width: none; }
+        .preview-card-stage { width: 100%; }
+        @media (max-width: 640px) {
+            #guide-preview-wrapper { padding: 10px !important; border-radius: 12px; }
+            .preview-shell { max-width: 100%; }
+        }
+        #phone-preview-modal iframe { -webkit-overflow-scrolling: touch; }
+        @media (max-width: 640px) {
+            #phone-preview-modal { padding: 8px !important; }
+            #phone-device-frame { width: min(92vw, 390px) !important; }
+        }
+
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        .img-preview-container img {
+            max-width: none !important;
+        }
+        .guide-card {
+            font-family: 'Inter', sans-serif !important;
+            display: grid !important;
+            width: 100% !important;
+            grid-template-columns: minmax(0, calc(100% - var(--cg-img-width))) minmax(0, var(--cg-img-width));
+            align-items: stretch;
+            width: 100%;
+            --cg-img-width: 42%;
+            min-height: 180px;
+        }
+        .guide-card .cg-preview-body { min-width: 0; width: auto; max-width: none; align-self: stretch; }
+        .guide-card .cg-preview-img { width: auto; max-width: none; align-self: stretch; justify-self: stretch; }
+        .guide-card .cg-preview-img {
+            min-width: 0 !important;
+            min-height: 100% !important;
+            margin: 0 !important;
+            align-self: stretch;
+            overflow: hidden;
+        }
+        .guide-card .cg-preview-img img {
+            display: block !important;
+            width: 100% !important;
+            height: 100% !important;
+            min-width: 100%;
+            min-height: 100%;
+            object-fit: cover !important;
+            object-position: center !important;
+            max-width: none !important;
+        }
+        @media (max-width: 640px) {
+            .guide-card {
+                height: auto !important;
+                min-height: 155px !important;
+                grid-template-columns: minmax(0, calc(100% - var(--cg-mobile-img-width))) minmax(0, var(--cg-mobile-img-width)) !important;
+            }
+            .guide-card .cg-preview-body {
+                width: auto !important;
+                flex: none !important;
+                padding: 11px !important;
+                min-width: 0 !important;
+            }
+            .guide-card .cg-preview-img {
+                width: auto !important;
+                flex: none !important;
+                margin: 0 !important;
+                min-height: 100% !important;
+                height: 100% !important;
+                align-self: stretch !important;
+            }
+            .guide-card .cg-preview-body h3 { font-size: var(--cg-step-title-size) !important; line-height: 1.18 !important; }
+            .guide-card .cg-preview-body p { font-size: var(--cg-step-desc-size) !important; line-height: 1.38 !important; }
+        }
+        @media (max-width: 380px) {
+            .guide-card {
+                grid-template-columns: minmax(0, calc(100% - var(--cg-mobile-img-width))) minmax(0, var(--cg-mobile-img-width)) !important;
+            }
+            .guide-card .cg-preview-body { padding: 9px !important; }
+            .guide-card .cg-preview-body h3 { font-size: var(--cg-step-title-size) !important; }
+            .guide-card .cg-preview-body p { font-size: var(--cg-step-desc-size) !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased min-h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="bg-slate-900 text-white shadow-md sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap justify-between items-center gap-4">
+            <div class="flex items-center space-x-3">
+                <div class="bg-blue-600 text-white p-2 rounded-xl shadow-inner flex items-center justify-center">
+                    <i class="fa-solid fa-list-check text-xl"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg leading-tight">Check-In Guide Builder</h1>
+                    <p class="text-xs text-slate-400">生成并导出专业 Airbnb 入住指南卡片</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-2 flex-wrap">
+                <button onclick="app.resetToDefault()" class="px-3 py-2 text-xs font-medium bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition border border-slate-700">
+                    <i class="fa-solid fa-rotate-right mr-1.5"></i> 重置默认
+                </button>
+                <button onclick="app.copyHtmlCode()" class="px-3 py-2 text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-lg transition border border-slate-700 flex items-center space-x-1.5">
+                    <i class="fa-solid fa-code"></i>
+                    <span>复制独立 HTML 代码</span>
+                </button>
+                <button onclick="app.openImportHtmlModal()" class="px-3 py-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition shadow-sm flex items-center space-x-1.5">
+                    <i class="fa-solid fa-file-import"></i>
+                    <span>导入已有 HTML</span>
+                </button>
+                <button onclick="app.exportImage()" id="export-btn" class="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow transition flex items-center space-x-1.5">
+                    <i class="fa-solid fa-download"></i>
+                    <span>下载卡片图片</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-1 w-full max-w-[1600px] mx-auto px-4 py-4 md:px-6 md:py-6 grid grid-cols-1 lg:grid-cols-[minmax(520px,0.95fr)_minmax(0,1.05fr)] gap-6 items-start">
+        
+        <!-- Left Panel: Controls & Editor -->
+        <section class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5 flex flex-col h-[calc(100vh-120px)] sticky top-20 min-w-0">
+            <div class="flex justify-between items-center pb-4 mb-4 border-b border-slate-100">
+                <h2 class="font-bold text-slate-900 text-base flex items-center">
+                    <i class="fa-solid fa-sliders text-blue-600 mr-2"></i> 自定义与步骤设置
+                </h2>
+                <button onclick="app.addStep()" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium px-3 py-1.5 rounded-lg transition flex items-center space-x-1">
+                    <i class="fa-solid fa-plus"></i> <span>添加步骤</span>
+                </button>
+            </div>
+
+            <div class="flex bg-slate-100 p-1 rounded-xl mb-4 text-xs font-medium">
+                <button onclick="app.switchTab('steps')" id="tab-steps" class="flex-1 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition font-medium">编辑步骤</button>
+                <button onclick="app.switchTab('style')" id="tab-style" class="flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition font-medium">全局样式</button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto pr-1 space-y-4" id="editor-container"></div>
+        </section>
+
+        <!-- Right Panel: Live Preview -->
+        <section class="min-w-0 flex flex-col w-full">
+            <div class="preview-shell bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-5 overflow-hidden w-full">
+                <div class="w-full flex justify-between items-center mb-4 pb-3 border-b border-slate-100 gap-3">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">实时预览区域</span>
+                        <span id="step-count-badge" class="text-xs bg-blue-50 text-blue-700 font-semibold px-2.5 py-1 rounded-full">5 个步骤</span>
+                    </div>
+                    <button onclick="app.openPhonePreview()" class="shrink-0 px-3 py-2 text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white rounded-lg shadow-sm transition flex items-center gap-1.5">
+                        <i class="fa-solid fa-mobile-screen-button"></i>
+                        <span>手机预览</span>
+                    </button>
+                </div>
+
+                <div id="guide-preview-wrapper" class="w-full bg-white rounded-xl transition-all duration-200 preview-card-stage">
+                    <div id="guide-steps-container" class="flex flex-col" style="gap: 16px;"></div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Import Existing HTML Modal -->
+    <div id="import-html-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-slate-200 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center">
+                    <i class="fa-solid fa-file-import text-purple-600 mr-2"></i> 导入已有 HTML
+                </h3>
+                <button onclick="app.closeImportHtmlModal()" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="bg-purple-50 border border-purple-100 rounded-xl p-3 text-[11px] text-purple-900 leading-relaxed">
+                把你之前做好的 HTML 代码粘贴到这里。系统会尝试自动读取<strong>步骤数量、标题、说明文字、序号、图片、图片位置、卡片高度和图片/文字比例</strong>，然后同步到左侧编辑器。
+            </div>
+            <textarea id="import-html-textarea" rows="16" spellcheck="false" placeholder="把之前做好的完整 HTML 代码粘贴到这里..." class="w-full text-xs font-mono bg-slate-50 border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-purple-500 focus:outline-none"></textarea>
+            <div class="flex items-center justify-between gap-3 pt-2 flex-wrap">
+                <div class="text-[10px] text-slate-400">支持本工具之前导出的 HTML，也支持常见的卡片 HTML 结构。</div>
+                <div class="flex space-x-2">
+                    <button onclick="app.closeImportHtmlModal()" class="px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">取消</button>
+                    <button onclick="app.importExistingHtml()" class="px-4 py-2 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white rounded-lg shadow transition">解析并同步</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Phone Preview Modal -->
+    <div id="phone-preview-modal" class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[60] hidden items-center justify-center p-4">
+        <div class="w-full max-w-[470px] h-[92vh] flex flex-col">
+            <div class="flex items-center justify-between mb-3 px-1">
+                <div class="text-white">
+                    <div class="font-bold text-sm flex items-center gap-2">
+                        <i class="fa-solid fa-mobile-screen-button"></i>
+                        手机实时预览
+                    </div>
+                    <div class="text-[10px] text-slate-300 mt-0.5">这里看到的就是手机网页里的实际显示效果</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <select id="phone-preview-width" onchange="app.changePhonePreviewWidth()" class="text-xs bg-white/10 text-white border border-white/20 rounded-lg px-2.5 py-2 outline-none">
+                        <option value="320">320px</option>
+                        <option value="360">360px</option>
+                        <option value="375" selected>375px</option>
+                        <option value="390">390px</option>
+                        <option value="430">430px</option>
+                    </select>
+                    <button onclick="app.closePhonePreview()" class="w-9 h-9 rounded-lg bg-white/10 hover:bg-white/20 text-white flex items-center justify-center">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            <div id="phone-device-frame" class="mx-auto h-full max-h-[calc(92vh-58px)] w-[375px] max-w-full bg-black rounded-[34px] p-[9px] shadow-2xl ring-1 ring-white/10 transition-all duration-200">
+                <div class="w-full h-full rounded-[27px] overflow-hidden bg-white relative">
+                    <div class="absolute top-0 left-1/2 -translate-x-1/2 z-10 w-28 h-5 bg-black rounded-b-2xl pointer-events-none"></div>
+                    <iframe id="phone-preview-iframe" title="手机预览" class="w-full h-full border-0 bg-white" scrolling="auto"></iframe>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- HTML Code Modal -->
+    <div id="html-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center">
+                    <i class="fa-solid fa-code text-blue-600 mr-2"></i> 编辑步骤自定义 HTML
+                </h3>
+                <button onclick="app.closeHtmlModal()" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <p class="text-[11px] text-slate-500">直接修改下方的 HTML 代码来自定义样式。留空则恢复默认生成的卡片。</p>
+            <textarea id="modal-html-textarea" rows="10" class="w-full text-xs font-mono bg-slate-50 border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="app.closeHtmlModal()" class="px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">取消</button>
+                <button onclick="app.saveCardHtml()" class="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow transition">保存代码</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Image Adjust Modal -->
+    <div id="img-modal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900 text-sm flex items-center">
+                    <i class="fa-solid fa-image text-blue-600 mr-2"></i> 调整图片缩放与位置
+                </h3>
+                <button onclick="app.closeImgModal()" class="text-slate-400 hover:text-slate-600 text-sm">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-3 text-xs">
+                <div>
+                    <label class="block font-semibold text-slate-600 mb-1 flex justify-between">
+                        <span>图片缩放 (Zoom)</span>
+                        <span id="scale-val-label" class="font-mono text-blue-600">100%</span>
+                    </label>
+                    <input type="range" id="img-scale-range" min="100" max="300" value="100" oninput="app.previewImageTransform()" class="w-full accent-blue-600">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 flex justify-between">
+                            <span>Position X (左右平移)</span>
+                            <span id="posx-val-label" class="font-mono text-blue-600">0px</span>
+                        </label>
+                        <input type="range" id="img-posx-range" min="-150" max="150" value="0" oninput="app.previewImageTransform()" class="w-full accent-blue-600">
+                    </div>
+                    <div>
+                        <label class="block font-semibold text-slate-600 mb-1 flex justify-between">
+                            <span>Position Y (上下平移)</span>
+                            <span id="posy-val-label" class="font-mono text-blue-600">0px</span>
+                        </label>
+                        <input type="range" id="img-posy-range" min="-150" max="150" value="0" oninput="app.previewImageTransform()" class="w-full accent-blue-600">
+                    </div>
+                </div>
+                <div class="w-full h-48 bg-slate-100 rounded-xl overflow-hidden relative border border-slate-200 flex items-center justify-center img-preview-container">
+                    <img id="img-preview-box" src="" class="absolute transition-transform duration-75 object-cover">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-2 pt-2">
+                <button onclick="app.closeImgModal()" class="px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition">取消</button>
+                <button onclick="app.saveImageTransform()" class="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg shadow transition">应用修改</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notice -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-slate-900 text-white px-4 py-2.5 rounded-xl shadow-2xl text-xs font-medium border border-slate-700 transition-opacity duration-300 opacity-0 pointer-events-none z-50 flex items-center space-x-2">
+        <i class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toast-message">操作成功</span>
+    </div>
+
+    <script>
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        const DEFAULT_STEPS = [
+            {
+                number: 1,
+                title: "Building Entrance",
+                desc: "57 Upper Pitt St,\nKirribilli NSW 2061.",
+                image: "https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?auto=format&fit=crop&w=800&q=80",
+                height: 180,
+                imgScale: 100,
+                imgPosX: 0,
+                imgPosY: 0,
+                bgColor: "#ffffff",
+                textColor: "#1e293b",
+                descColor: "#475569",
+                badgeBg: "",
+                badgeText: "",
+                titleSize: null,
+                descSize: null,
+                badgeSize: null,
+                customHtml: ""
+            },
+            {
+                number: 2,
+                title: "MAILBOX 709",
+                desc: "Code 712\nOpen it and take the key",
+                image: "https://images.unsplash.com/photo-1588854337236-6889d631faa8?auto=format&fit=crop&w=800&q=80",
+                height: 180,
+                imgScale: 100,
+                imgPosX: 0,
+                imgPosY: 0,
+                bgColor: "#ffffff",
+                textColor: "#1e293b",
+                descColor: "#475569",
+                badgeBg: "",
+                badgeText: "",
+                titleSize: null,
+                descSize: null,
+                badgeSize: null,
+                customHtml: ""
+            },
+            {
+                number: 3,
+                title: "Go to Level 7",
+                desc: "Tap your fob\nTake the lift to Level 7\nThen turn left",
+                image: "https://images.unsplash.com/photo-1574958269340-fa927503f3dd?auto=format&fit=crop&w=800&q=80",
+                height: 180,
+                imgScale: 100,
+                imgPosX: 0,
+                imgPosY: 0,
+                bgColor: "#ffffff",
+                textColor: "#1e293b",
+                descColor: "#475569",
+                badgeBg: "",
+                badgeText: "",
+                titleSize: null,
+                descSize: null,
+                badgeSize: null,
+                customHtml: ""
+            },
+            {
+                number: 4,
+                title: "ROOM 709",
+                desc: "Look for the screen door\nIt's the only one on Level 7",
+                image: "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=800&q=80",
+                height: 180,
+                imgScale: 100,
+                imgPosX: 0,
+                imgPosY: 0,
+                bgColor: "#ffffff",
+                textColor: "#1e293b",
+                descColor: "#475569",
+                badgeBg: "",
+                badgeText: "",
+                titleSize: null,
+                descSize: null,
+                badgeSize: null,
+                customHtml: ""
+            },
+            {
+                number: 5,
+                title: "Unlock the door",
+                desc: "1. Unlock the lower lock with the silver key.\n2. Unlock the upper lock with the blue key while turning the lower handle.",
+                image: "https://images.unsplash.com/photo-1558002038-1055907df827?auto=format&fit=crop&w=800&q=80",
+                height: 180,
+                imgScale: 100,
+                imgPosX: 0,
+                imgPosY: 0,
+                bgColor: "#ffffff",
+                textColor: "#1e293b",
+                descColor: "#475569",
+                badgeBg: "",
+                badgeText: "",
+                titleSize: null,
+                descSize: null,
+                badgeSize: null,
+                customHtml: ""
+            }
+        ];
+
+        class GuideBuilder {
+            constructor() {
+                this.steps = JSON.parse(JSON.stringify(DEFAULT_STEPS));
+                this.activeTab = 'steps';
+                this.styleConfig = {
+                    cardRadius: '16px',
+                    gap: 16,
+                    globalHeight: 180,
+                    contentPadding: 24, 
+                    titleSize: 20,
+                    descSize: 14,
+                    imageWidth: 42,
+                    mobileImageWidth: 42,
+                    badgeSize: 36,      
+                    badgeFontSize: 16,  
+                    badgeBg: '#111827', 
+                    badgeText: '#ffffff'
+                };
+                this.editingStepIndex = null;
+                this.init();
+            }
+
+            init() {
+                this.renderEditor();
+                this.renderPreview();
+            }
+
+            switchTab(tab) {
+                this.activeTab = tab;
+                document.getElementById('tab-steps').className = tab === 'steps' ? 'flex-1 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition font-medium' : 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition font-medium';
+                document.getElementById('tab-style').className = tab === 'style' ? 'flex-1 py-2 rounded-lg bg-white text-slate-900 shadow-sm transition font-medium' : 'flex-1 py-2 rounded-lg text-slate-600 hover:text-slate-900 transition font-medium';
+                this.renderEditor();
+            }
+
+            getDescLines(step) {
+                const lines = String(step.desc || '').split(/\r?\n/);
+                const sizes = Array.isArray(step.descLineSizes) ? step.descLineSizes : [];
+                return lines.map((text, i) => ({
+                    text,
+                    size: Number(sizes[i]) || Number(step.descSize) || Number(this.styleConfig.descSize) || 14
+                }));
+            }
+
+            updateDescLineSize(index, lineIndex, value) {
+                const step = this.steps[index];
+                const lines = String(step.desc || '').split(/\r?\n/);
+                const sizes = Array.isArray(step.descLineSizes) ? [...step.descLineSizes] : [];
+                const fallback = Number(step.descSize) || Number(this.styleConfig.descSize) || 14;
+                while (sizes.length < lines.length) sizes.push(fallback);
+                sizes[lineIndex] = parseInt(value, 10) || fallback;
+                step.descLineSizes = sizes;
+                this.renderPreview();
+                this.updatePhonePreview();
+            }
+
+            renderEditor() {
+                const container = document.getElementById('editor-container');
+                container.innerHTML = '';
+
+                if (this.activeTab === 'steps') {
+                    this.steps.forEach((step, index) => {
+                        const stepEl = document.createElement('div');
+                        stepEl.className = 'bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 relative group';
+                        stepEl.innerHTML = `
+                            <div class="flex justify-between items-center">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-xs font-bold uppercase tracking-wider text-slate-500 bg-slate-200 px-2 py-0.5 rounded">步骤 ${index + 1}</span>
+                                    ${step.customHtml ? '<span class="text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">自定义 HTML</span>' : ''}
+                                </div>
+                                <div class="flex items-center space-x-1">
+                                    <button onclick="app.openHtmlModal(${index})" title="编辑 HTML 代码" class="p-1.5 text-purple-500 hover:text-purple-700"><i class="fa-solid fa-code text-xs"></i></button>
+                                    <button onclick="app.moveStep(${index}, -1)" ${index === 0 ? 'disabled' : ''} class="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-30"><i class="fa-solid fa-arrow-up text-xs"></i></button>
+                                    <button onclick="app.moveStep(${index}, 1)" ${index === this.steps.length - 1 ? 'disabled' : ''} class="p-1.5 text-slate-400 hover:text-slate-700 disabled:opacity-30"><i class="fa-solid fa-arrow-down text-xs"></i></button>
+                                    <button onclick="app.deleteStep(${index})" class="p-1.5 text-red-400 hover:text-red-600 ml-1"><i class="fa-solid fa-trash-can text-xs"></i></button>
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">序号数字</label>
+                                    <input type="number" value="${step.number}" onchange="app.updateStep(${index}, 'number', parseInt(this.value))" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                                </div>
+                                <div>
+                                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">步骤标题（支持换行）</label>
+                                    <textarea rows="2" oninput="app.updateStep(${index}, 'title', this.value)" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none uppercase resize-y">${escapeHtml(step.title)}</textarea>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">详细说明（每一行可单独设置字号）</label>
+                                <textarea rows="4" onchange="app.updateStep(${index}, 'desc', this.value); app.renderEditor();" class="w-full text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">${escapeHtml(step.desc)}</textarea>
+                                <div class="mt-2 space-y-1.5">
+                                    ${this.getDescLines(step).map((line, lineIndex) => `
+                                        <div class="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-2 py-1.5">
+                                            <span class="text-[10px] text-slate-400 w-8 flex-shrink-0">第${lineIndex + 1}行</span>
+                                            <span class="text-[10px] text-slate-600 truncate flex-1" title="${escapeHtml(line.text)}">${escapeHtml(line.text) || '（空行）'}</span>
+                                            <input type="range" min="8" max="24" value="${line.size}" oninput="app.updateDescLineSize(${index}, ${lineIndex}, this.value); this.nextElementSibling.innerText=this.value+'px';" class="w-20 accent-blue-600 flex-shrink-0">
+                                            <span class="text-[10px] font-mono text-blue-600 w-8 text-right">${line.size}px</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1 flex justify-between">
+                                    <span>卡片高度 Height</span>
+                                    <span class="font-mono text-blue-600">${step.height ? step.height + 'px' : '自适应'}</span>
+                                </label>
+                                <input type="range" min="120" max="400" value="${step.height || 180}" oninput="app.updateStep(${index}, 'height', parseInt(this.value))" class="w-full accent-blue-600">
+                            </div>
+                            
+                            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">此步骤标题字号</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="range" min="10" max="32" value="${step.titleSize || this.styleConfig.titleSize}" oninput="app.updateStep(${index}, 'titleSize', parseInt(this.value)); this.nextElementSibling.innerText=this.value+'px';" class="flex-1 accent-blue-600">
+                                        <span class="text-[10px] font-mono text-blue-600">${step.titleSize || this.styleConfig.titleSize}px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">此步骤说明字号</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="range" min="8" max="20" value="${step.descSize || this.styleConfig.descSize}" oninput="app.updateStep(${index}, 'descSize', parseInt(this.value)); this.nextElementSibling.innerText=this.value+'px';" class="flex-1 accent-blue-600">
+                                        <span class="text-[10px] font-mono text-blue-600">${step.descSize || this.styleConfig.descSize}px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">此步骤徽章尺寸</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="range" min="24" max="64" value="${step.badgeSize || this.styleConfig.badgeSize}" oninput="app.updateStep(${index}, 'badgeSize', parseInt(this.value)); this.nextElementSibling.innerText=this.value+'px';" class="flex-1 accent-blue-600">
+                                        <span class="text-[10px] font-mono text-blue-600">${step.badgeSize || this.styleConfig.badgeSize}px</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">此步骤徽章数字字号</label>
+                                    <div class="flex items-center gap-2">
+                                        <input type="range" min="1" max="28" value="${step.badgeFontSize || this.styleConfig.badgeFontSize}" oninput="app.updateStep(${index}, 'badgeFontSize', parseInt(this.value)); this.nextElementSibling.innerText=this.value+'px';" class="flex-1 accent-blue-600">
+                                        <span class="text-[10px] font-mono text-blue-600">${step.badgeFontSize || this.styleConfig.badgeFontSize}px</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-2 gap-2 pt-1 border-t border-slate-200">
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">此步骤徽章背景色</label>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="color" value="${step.badgeBg || this.styleConfig.badgeBg}" onchange="app.updateStep(${index}, 'badgeBg', this.value)" class="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0 bg-transparent">
+                                        <button onclick="app.updateStep(${index}, 'badgeBg', '')" class="px-2 py-1 text-[10px] bg-slate-100 rounded text-slate-600">跟随全局</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">此步骤徽章数字颜色</label>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="color" value="${step.badgeText || this.styleConfig.badgeText}" onchange="app.updateStep(${index}, 'badgeText', this.value)" class="w-8 h-8 rounded border border-slate-300 cursor-pointer p-0 bg-transparent">
+                                        <button onclick="app.updateStep(${index}, 'badgeText', '')" class="px-2 py-1 text-[10px] bg-slate-100 rounded text-slate-600">跟随全局</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="grid grid-cols-3 gap-2 pt-1 border-t border-slate-200">
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">卡片背景色</label>
+                                    <div class="flex items-center space-x-1.5">
+                                        <input type="color" value="${step.bgColor || '#ffffff'}" onchange="app.updateStep(${index}, 'bgColor', this.value)" class="w-7 h-7 rounded border border-slate-300 cursor-pointer p-0 bg-transparent">
+                                        <span class="text-[10px] text-slate-500 uppercase font-mono">${step.bgColor || '#ffffff'}</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">标题颜色</label>
+                                    <div class="flex items-center space-x-1.5">
+                                        <input type="color" value="${step.textColor || '#1e293b'}" onchange="app.updateStep(${index}, 'textColor', this.value)" class="w-7 h-7 rounded border border-slate-300 cursor-pointer p-0 bg-transparent">
+                                        <span class="text-[10px] text-slate-500 uppercase font-mono">${step.textColor || '#1e293b'}</span>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-semibold text-slate-500 mb-1">说明文字颜色</label>
+                                    <div class="flex items-center space-x-1.5">
+                                        <input type="color" value="${step.descColor || '#475569'}" onchange="app.updateStep(${index}, 'descColor', this.value)" class="w-7 h-7 rounded border border-slate-300 cursor-pointer p-0 bg-transparent">
+                                        <span class="text-[10px] text-slate-500 uppercase font-mono">${step.descColor || '#475569'}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="block text-[11px] font-semibold text-slate-600 mb-1">图片链接 / 上传</label>
+                                <div class="flex space-x-2">
+                                    <input type="text" value="${step.image}" oninput="app.updateStep(${index}, 'image', this.value)" class="flex-1 text-xs bg-white border border-slate-300 rounded-lg px-2.5 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none" placeholder="图片 URL">
+                                    <button onclick="app.openImgModal(${index})" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center space-x-1 transition" title="调整图片位置 & 缩放">
+                                        <i class="fa-solid fa-crop-simple"></i>
+                                    </button>
+                                    <label class="cursor-pointer bg-slate-200 hover:bg-slate-300 text-slate-700 px-3 py-1.5 rounded-lg text-xs font-medium flex items-center justify-center transition">
+                                        <i class="fa-solid fa-upload"></i>
+                                        <input type="file" accept="image/*" class="hidden" onchange="app.handleImageUpload(event, ${index})">
+                                    </label>
+                                </div>
+                            </div>
+                        `;
+                        container.appendChild(stepEl);
+                    });
+                } else {
+                    container.innerHTML = `
+                        <div class="space-y-4 text-xs">
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                <h3 class="font-bold text-slate-900">卡片布局与尺寸</h3>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1 flex justify-between">
+                                        <span>一键统一卡片高度</span>
+                                        <span class="font-mono text-blue-600">${this.styleConfig.globalHeight}px</span>
+                                    </label>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="range" min="120" max="400" value="${this.styleConfig.globalHeight}" oninput="app.styleConfig.globalHeight = parseInt(this.value); this.previousElementSibling.firstElementChild.nextElementSibling.innerText = this.value + 'px';" class="flex-1 accent-blue-600">
+                                        <button onclick="app.applyGlobalHeight()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[11px] font-medium transition shadow-sm">应用到所有</button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">卡片间距 Gap (${this.styleConfig.gap}px)</label>
+                                    <input type="range" min="0" max="32" value="${this.styleConfig.gap}" oninput="app.updateStyle('gap', parseInt(this.value))" class="w-full accent-blue-600">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1 flex justify-between">
+                                        <span>图片宽度 / 文字宽度</span>
+                                        <span class="font-mono text-blue-600">${this.styleConfig.imageWidth}% / ${100 - this.styleConfig.imageWidth}%</span>
+                                    </label>
+                                    <input type="range" min="20" max="70" value="${this.styleConfig.imageWidth}" oninput="app.updateStyle('imageWidth', parseInt(this.value))" class="w-full accent-blue-600">
+                                    <div class="text-[10px] text-slate-400 mt-1">手机上也会按这个比例自适应：图片越宽，文字区域越窄。</div>
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">内部边距 Padding (${this.styleConfig.contentPadding}px)</label>
+                                    <input type="range" min="12" max="40" value="${this.styleConfig.contentPadding}" oninput="app.updateStyle('contentPadding', parseInt(this.value))" class="w-full accent-blue-600">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1 flex justify-between">
+                                        <span>手机图片宽度 / 文字宽度</span>
+                                        <span class="font-mono text-blue-600">${this.styleConfig.mobileImageWidth}% / ${100-this.styleConfig.mobileImageWidth}%</span>
+                                    </label>
+                                    <input type="range" min="20" max="70" value="${this.styleConfig.mobileImageWidth}" oninput="app.updateStyle('mobileImageWidth', parseInt(this.value))" class="w-full accent-blue-600">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">卡片圆角 Radius (${this.styleConfig.cardRadius})</label>
+                                    <select onchange="app.updateStyle('cardRadius', this.value)" class="w-full bg-white border border-slate-300 rounded-lg p-2">
+                                        <option value="12px" ${this.styleConfig.cardRadius === '12px' ? 'selected' : ''}>小圆角 (12px)</option>
+                                        <option value="16px" ${this.styleConfig.cardRadius === '16px' ? 'selected' : ''}>中圆角 (16px)</option>
+                                        <option value="24px" ${this.styleConfig.cardRadius === '24px' ? 'selected' : ''}>大圆角 (24px)</option>
+                                        <option value="0px" ${this.styleConfig.cardRadius === '0px' ? 'selected' : ''}>直角 (0px)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                <h3 class="font-bold text-slate-900">文字排版设置</h3>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">标题字号 (${this.styleConfig.titleSize}px)</label>
+                                    <input type="range" min="10" max="32" value="${this.styleConfig.titleSize}" oninput="app.updateStyle('titleSize', parseInt(this.value))" class="w-full accent-blue-600">
+                                </div>
+                                <div>
+                                    <label class="block font-semibold text-slate-600 mb-1">说明文字字号 (${this.styleConfig.descSize}px)</label>
+                                    <input type="range" min="8" max="20" value="${this.styleConfig.descSize}" oninput="app.updateStyle('descSize', parseInt(this.value))" class="w-full accent-blue-600">
+                                </div>
+                            </div>
+
+                            <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
+                                <h3 class="font-bold text-slate-900">全局徽章 (Badge) 设置</h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label class="block font-semibold text-slate-600 mb-1">徽章尺寸 (${this.styleConfig.badgeSize}px)</label>
+                                        <input type="range" min="10" max="56" value="${this.styleConfig.badgeSize}" oninput="app.updateStyle('badgeSize', parseInt(this.value))" class="w-full accent-blue-600">
+                                    </div>
+                                    <div>
+                                        <label class="block font-semibold text-slate-600 mb-1">数字字号 (${this.styleConfig.badgeFontSize}px)</label>
+                                        <input type="range" min="1" max="24" value="${this.styleConfig.badgeFontSize}" oninput="app.updateStyle('badgeFontSize', parseInt(this.value))" class="w-full accent-blue-600">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-2 pt-1">
+                                    <div>
+                                        <label class="block font-semibold text-slate-600 mb-1">徽章背景色</label>
+                                        <input type="color" value="${this.styleConfig.badgeBg}" onchange="app.updateStyle('badgeBg', this.value)" class="w-full h-8 rounded border border-slate-300 cursor-pointer bg-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block font-semibold text-slate-600 mb-1">徽章数字颜色</label>
+                                        <input type="color" value="${this.styleConfig.badgeText}" onchange="app.updateStyle('badgeText', this.value)" class="w-full h-8 rounded border border-slate-300 cursor-pointer bg-transparent">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="bg-blue-50 p-4 rounded-xl border border-blue-200 space-y-3">
+                                <h3 class="font-bold text-blue-900 flex items-center"><i class="fa-solid fa-wand-magic-sparkles mr-1.5 text-blue-600"></i> 快速应用全套配色</h3>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <button onclick="app.applyPreset('#ffffff', '#1e293b', '#475569')" class="px-3 py-2 bg-white border border-slate-200 rounded-lg font-medium text-slate-700 shadow-sm hover:bg-slate-50">经典纯白主题</button>
+                                    <button onclick="app.applyPreset('#0f172a', '#f8fafc', '#94a3b8')" class="px-3 py-2 bg-slate-900 text-white rounded-lg font-medium shadow-sm hover:bg-slate-800">暗黑质感主题</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            renderPreview() {
+                const container = document.getElementById('guide-steps-container');
+                container.style.gap = `${this.styleConfig.gap}px`;
+                container.innerHTML = '';
+
+                document.getElementById('step-count-badge').innerText = `${this.steps.length} 个步骤`;
+
+                this.steps.forEach((step, index) => {
+                    const card = document.createElement('div');
+                    card.style.borderRadius = this.styleConfig.cardRadius;
+                    card.style.backgroundColor = step.bgColor || '#ffffff';
+                    
+                    if (step.height) {
+                        card.style.height = `${step.height}px`;
+                    } else {
+                        card.style.height = 'auto';
+                    }
+                    card.style.setProperty('--cg-img-width', `${this.styleConfig.imageWidth}%`);
+                    card.style.setProperty('--cg-mobile-img-width', `${this.styleConfig.mobileImageWidth}%`);
+                    card.style.setProperty('--cg-step-title-size', `${step.titleSize || this.styleConfig.titleSize}px`);
+                    card.style.setProperty('--cg-step-desc-size', `${step.descSize || this.styleConfig.descSize}px`);
+                    
+
+                    card.className = "guide-card overflow-hidden shadow-md border border-slate-100 grid items-stretch transition-all relative";
+
+                    if (step.customHtml && step.customHtml.trim() !== "") {
+                        card.innerHTML = step.customHtml;
+                    } else {
+                        const badgeBg = step.badgeBg || this.styleConfig.badgeBg;
+                        const badgeText = step.badgeText || this.styleConfig.badgeText;
+                        const descLines = this.getDescLines(step);
+                        const formattedDesc = descLines.map((line, lineIndex) =>
+                            `<span class="cg-desc-line" style="font-size:${line.size}px;">${escapeHtml(line.text) || '&nbsp;'}</span>`
+                        ).join('<br>');
+
+                        const scale = (step.imgScale || 100) / 100;
+                        const posX = step.imgPosX !== undefined ? step.imgPosX : 0;
+                        const posY = step.imgPosY !== undefined ? step.imgPosY : 0;
+
+                        card.innerHTML = `
+                            <div class="cg-preview-body min-w-0 flex flex-col justify-start items-start text-left overflow-hidden" style="padding: ${this.styleConfig.contentPadding}px;">
+                                <div class="flex items-center space-x-3 mb-3 w-full text-left">
+                                    <div class="flex items-center justify-center font-bold rounded-full flex-shrink-0" 
+                                         style="width: ${step.badgeSize || this.styleConfig.badgeSize}px; height: ${step.badgeSize || this.styleConfig.badgeSize}px; background-color: ${badgeBg}; color: ${badgeText}; font-size: ${step.badgeFontSize || this.styleConfig.badgeFontSize}px;">
+                                        ${step.number}
+                                    </div>
+                                    <h3 class="font-extrabold uppercase tracking-wide leading-snug break-words flex-1 min-w-0 text-left" 
+                                        style="color: ${step.textColor || '#1e293b'}; font-size: ${step.titleSize || this.styleConfig.titleSize}px;">
+                                        ${escapeHtml(step.title)}
+                                    </h3>
+                                </div>
+                                <p class="leading-relaxed font-normal overflow-y-auto w-full text-left" 
+                                   style="color: ${step.descColor || '#475569'}; font-size: ${step.descSize || this.styleConfig.descSize}px;">
+                                    ${formattedDesc}
+                                </p>
+                            </div>
+                            <div class="cg-preview-img relative overflow-hidden bg-slate-100 cursor-pointer img-preview-container flex-shrink-0" style="min-height: 0; height: 100%;" onclick="app.openImgModal(${index})">
+                                <img src="${step.image}" alt="${escapeHtml(step.title)}" class="absolute inset-0 w-full h-full object-cover" 
+                                     style="transform: translate(${posX}px, ${posY}px) scale(${scale}); transform-origin: center center;">
+                            </div>
+                        `;
+                    }
+                    container.appendChild(card);
+                });
+
+                if (!document.getElementById('phone-preview-modal')?.classList.contains('hidden')) {
+                    clearTimeout(this.phonePreviewTimer);
+                    this.phonePreviewTimer = setTimeout(() => this.updatePhonePreview(), 120);
+                }
+            }
+
+            updateStep(index, key, value) {
+                this.steps[index][key] = value;
+                if (key === 'desc') {
+                    const lineCount = String(value || '').split(/\r?\n/).length;
+                    const fallback = Number(this.steps[index].descSize) || Number(this.styleConfig.descSize) || 14;
+                    const oldSizes = Array.isArray(this.steps[index].descLineSizes) ? this.steps[index].descLineSizes : [];
+                    this.steps[index].descLineSizes = Array.from({length: lineCount}, (_, i) => Number(oldSizes[i]) || fallback);
+                }
+                this.renderPreview();
+                if (key === 'imgScale' || key === 'imgPosX' || key === 'imgPosY') {
+                    this.renderEditor();
+                }
+            }
+
+            applyGlobalHeight() {
+                const targetH = this.styleConfig.globalHeight;
+                this.steps.forEach(step => {
+                    step.height = targetH;
+                });
+                this.renderPreview();
+                this.renderEditor();
+                this.showToast(`已成功将所有卡片高度统一设置为 ${targetH}px`);
+            }
+
+            updateStyle(key, value) {
+                this.styleConfig[key] = value;
+                this.renderPreview();
+                this.renderEditor();
+            }
+
+            applyPreset(bgColor, textColor, descColor) {
+                this.steps.forEach(step => {
+                    step.bgColor = bgColor;
+                    step.textColor = textColor;
+                    step.descColor = descColor;
+                });
+                this.renderPreview();
+                this.renderEditor();
+                this.showToast("通用主题颜色已应用");
+            }
+
+            addStep() {
+                const newStepNum = this.steps.length + 1;
+                this.steps.push({
+                    number: newStepNum,
+                    title: `Step ${newStepNum} Title`,
+                    desc: "填写入住指令或提示信息...",
+                    image: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?auto=format&fit=crop&w=800&q=80",
+                    height: this.styleConfig.globalHeight || 180,
+                    imgScale: 100,
+                    imgPosX: 0,
+                    imgPosY: 0,
+                    bgColor: "#ffffff",
+                    textColor: "#1e293b",
+                    descColor: "#475569",
+                    badgeBg: "",
+                badgeText: "",
+                titleSize: null,
+                descSize: null,
+                badgeSize: null,
+                customHtml: ""
+                });
+                this.renderEditor();
+                this.renderPreview();
+                this.showToast("已添加新步骤");
+            }
+
+            deleteStep(index) {
+                if (this.steps.length <= 1) {
+                    alert("至少保留一个步骤");
+                    return;
+                }
+                this.steps.splice(index, 1);
+                this.renderEditor();
+                this.renderPreview();
+            }
+
+            moveStep(index, direction) {
+                const target = index + direction;
+                if (target < 0 || target >= this.steps.length) return;
+                const temp = this.steps[index];
+                this.steps[index] = this.steps[target];
+                this.steps[target] = temp;
+                this.renderEditor();
+                this.renderPreview();
+            }
+
+            handleImageUpload(event, index) {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        this.updateStep(index, 'image', e.target.result);
+                        this.renderEditor();
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+
+            openHtmlModal(index) {
+                this.editingStepIndex = index;
+                const step = this.steps[index];
+                document.getElementById('modal-html-textarea').value = step.customHtml || '';
+                document.getElementById('html-modal').classList.remove('hidden');
+            }
+
+            closeHtmlModal() {
+                document.getElementById('html-modal').classList.add('hidden');
+                this.editingStepIndex = null;
+            }
+
+            saveCardHtml() {
+                if (this.editingStepIndex !== null) {
+                    const val = document.getElementById('modal-html-textarea').value;
+                    this.steps[this.editingStepIndex].customHtml = val;
+                    this.renderPreview();
+                    this.renderEditor();
+                    this.closeHtmlModal();
+                    this.showToast("HTML 保存成功");
+                }
+            }
+
+            openImgModal(index) {
+                this.editingStepIndex = index;
+                const step = this.steps[index];
+                document.getElementById('img-scale-range').value = step.imgScale || 100;
+                document.getElementById('img-posx-range').value = step.imgPosX !== undefined ? step.imgPosX : 0;
+                document.getElementById('img-posy-range').value = step.imgPosY !== undefined ? step.imgPosY : 0;
+                
+                const previewImg = document.getElementById('img-preview-box');
+                previewImg.src = step.image;
+                
+                this.previewImageTransform();
+                document.getElementById('img-modal').classList.remove('hidden');
+            }
+
+            closeImgModal() {
+                document.getElementById('img-modal').classList.add('hidden');
+                this.editingStepIndex = null;
+            }
+
+            previewImageTransform() {
+                const scale = parseInt(document.getElementById('img-scale-range').value) / 100;
+                const posx = parseInt(document.getElementById('img-posx-range').value);
+                const posy = parseInt(document.getElementById('img-posy-range').value);
+
+                document.getElementById('scale-val-label').innerText = `${Math.round(scale * 100)}%`;
+                document.getElementById('posx-val-label').innerText = `${posx}px`;
+                document.getElementById('posy-val-label').innerText = `${posy}px`;
+
+                const previewImg = document.getElementById('img-preview-box');
+                previewImg.style.transform = `translate(${posx}px, ${posy}px) scale(${scale})`;
+            }
+
+            saveImageTransform() {
+                if (this.editingStepIndex !== null) {
+                    const scale = parseInt(document.getElementById('img-scale-range').value);
+                    const posx = parseInt(document.getElementById('img-posx-range').value);
+                    const posy = parseInt(document.getElementById('img-posy-range').value);
+
+                    this.steps[this.editingStepIndex].imgScale = scale;
+                    this.steps[this.editingStepIndex].imgPosX = posx;
+                    this.steps[this.editingStepIndex].imgPosY = posy;
+
+                    this.renderPreview();
+                    this.renderEditor();
+                    this.closeImgModal();
+                    this.showToast("图片位置与缩放保存成功");
+                }
+            }
+
+            resetToDefault() {
+                if (confirm("确定要恢复到默认设置吗？已修改的数据将丢失。")) {
+                    this.steps = JSON.parse(JSON.stringify(DEFAULT_STEPS));
+                    this.renderEditor();
+                    this.renderPreview();
+                    this.showToast("已重置默认设置");
+                }
+            }
+
+            openImportHtmlModal() {
+                document.getElementById('import-html-modal').classList.remove('hidden');
+                const ta = document.getElementById('import-html-textarea');
+                ta.focus();
+            }
+
+            closeImportHtmlModal() {
+                document.getElementById('import-html-modal').classList.add('hidden');
+            }
+
+            parseCssNumber(value, fallback) {
+                if (value === undefined || value === null || value === '') return fallback;
+                const n = parseFloat(String(value).replace('%', '').replace('px', ''));
+                return Number.isFinite(n) ? n : fallback;
+            }
+
+            extractTransform(img) {
+                const style = img?.getAttribute('style') || '';
+                let posX = 0, posY = 0, scale = 100;
+                const m = style.match(/translate\(\s*(-?[\d.]+)px\s*,\s*(-?[\d.]+)px\s*\)\s*scale\(\s*([\d.]+)\s*\)/i);
+                if (m) {
+                    posX = parseFloat(m[1]) || 0;
+                    posY = parseFloat(m[2]) || 0;
+                    scale = (parseFloat(m[3]) || 1) * 100;
+                }
+                return { posX, posY, scale };
+            }
+
+            getTextFromElement(el) {
+                return (el?.textContent || '').replace(/\s+/g, ' ').trim();
+            }
+
+            extractStepFromCard(card, index) {
+                const img = card.querySelector('img');
+                const badge = card.querySelector('.cg-badge, [class*="badge"]');
+                const titleEl = card.querySelector('.cg-title, h1, h2, h3, h4, [class*="title"]');
+                const descEl = card.querySelector('.cg-desc, p, [class*="desc"], [class*="description"]');
+
+                let title = this.getTextFromElement(titleEl);
+                let desc = this.getTextFromElement(descEl);
+                let number = parseInt(this.getTextFromElement(badge), 10);
+                if (!Number.isFinite(number)) number = index + 1;
+
+                // Generic fallback: use visible text when the source HTML doesn't use our classes.
+                if (!title) {
+                    const heading = card.querySelector('strong, b');
+                    title = this.getTextFromElement(heading);
+                }
+                if (!desc) {
+                    const clone = card.cloneNode(true);
+                    clone.querySelectorAll('img, svg, [class*="badge"], h1, h2, h3, h4, strong, b').forEach(el => el.remove());
+                    desc = this.getTextFromElement(clone);
+                }
+
+                const transform = this.extractTransform(img);
+                let height = 180;
+                const cardStyle = card.getAttribute('style') || '';
+                const heightMatch = cardStyle.match(/(?:--cg-card-min-height|height)\s*:\s*([\d.]+)px/i);
+                if (heightMatch) height = Math.round(parseFloat(heightMatch[1]));
+
+                const getInlineColor = (selector, fallback) => {
+                    const el = card.querySelector(selector);
+                    const st = el?.getAttribute('style') || '';
+                    const m = st.match(/color\s*:\s*([^;]+)/i);
+                    return m ? m[1].trim() : fallback;
+                };
+                const getInlineBg = (selector, fallback) => {
+                    const el = card.querySelector(selector);
+                    const st = el?.getAttribute('style') || '';
+                    const m = st.match(/background(?:-color)?\s*:\s*([^;]+)/i);
+                    return m ? m[1].trim() : fallback;
+                };
+
+                const cardBg = getInlineBg('.cg-badge, [class*="badge"]', '');
+                const badgeText = getInlineColor('.cg-badge, [class*="badge"]', '');
+
+                return {
+                    number,
+                    title: title || `Step ${index + 1}`,
+                    desc: desc || '',
+                    image: img?.getAttribute('src') || '',
+                    height,
+                    imgScale: Math.round(transform.scale),
+                    imgPosX: Math.round(transform.posX),
+                    imgPosY: Math.round(transform.posY),
+                    bgColor: '#ffffff',
+                    textColor: getInlineColor('.cg-title, h1, h2, h3, h4, [class*="title"]', '#1e293b'),
+                    descColor: getInlineColor('.cg-desc, p, [class*="desc"], [class*="description"]', '#475569'),
+                    badgeBg: cardBg,
+                    badgeText,
+                    customHtml: ''
+                };
+            }
+
+            importExistingHtml() {
+                const raw = document.getElementById('import-html-textarea').value.trim();
+                if (!raw) {
+                    alert('请先粘贴 HTML 代码。');
+                    return;
+                }
+
+                try {
+                    const parser = new DOMParser();
+                    const parsed = parser.parseFromString(raw, 'text/html');
+
+                    let cards = Array.from(parsed.querySelectorAll('.cg-card'));
+                    if (!cards.length) {
+                        cards = Array.from(parsed.querySelectorAll('[data-guide-card], article, section, .card'))
+                            .filter(el => el.querySelector('img'));
+                    }
+                    if (!cards.length) {
+                        const imgEls = Array.from(parsed.querySelectorAll('img'));
+                        cards = imgEls.map(img => {
+                            let parent = img.parentElement;
+                            while (parent && parent !== parsed.body && parent.querySelectorAll('img').length > 1) parent = parent.parentElement;
+                            return parent || img.parentElement;
+                        }).filter(Boolean);
+                        cards = [...new Set(cards)];
+                    }
+
+                    if (!cards.length) {
+                        alert('没有找到可识别的卡片或图片。请确认你粘贴的是完整 HTML。');
+                        return;
+                    }
+
+                    const newSteps = cards.map((card, index) => this.extractStepFromCard(card, index));
+                    const validSteps = newSteps.filter(step => step.title || step.desc || step.image);
+                    if (!validSteps.length) {
+                        alert('HTML 已读取，但没有识别出可编辑的文字或图片。');
+                        return;
+                    }
+
+                    this.steps = validSteps;
+
+                    // Sync global image/text ratio from exported CSS when available.
+                    const cssText = Array.from(parsed.querySelectorAll('style')).map(s => s.textContent || '').join('\n');
+                    let widthMatch = cssText.match(/--cg-img-width\s*:\s*([\d.]+)%/i);
+                    if (!widthMatch) widthMatch = cssText.match(/\.cg-imgbox[^{}]*width\s*:\s*([\d.]+)%/i);
+                    if (widthMatch) {
+                        const imageWidth = Math.max(20, Math.min(70, parseFloat(widthMatch[1])));
+                        this.styleConfig.imageWidth = imageWidth;
+                        this.styleConfig.mobileImageWidth = imageWidth;
+                    }
+
+                    // Sync shared typography when it exists in the source CSS.
+                    const titleMatch = cssText.match(/\.cg-title[^{}]*font-size\s*:\s*([\d.]+)px/i);
+                    const descMatch = cssText.match(/\.cg-desc[^{}]*font-size\s*:\s*([\d.]+)px/i);
+                    const gapMatch = cssText.match(/\.cg-wrap[^{}]*gap\s*:\s*([\d.]+)px/i);
+                    if (titleMatch) this.styleConfig.titleSize = this.parseCssNumber(titleMatch[1], this.styleConfig.titleSize);
+                    if (descMatch) this.styleConfig.descSize = this.parseCssNumber(descMatch[1], this.styleConfig.descSize);
+                    if (gapMatch) this.styleConfig.gap = this.parseCssNumber(gapMatch[1], this.styleConfig.gap);
+
+                    this.activeTab = 'steps';
+                    this.renderEditor();
+                    this.renderPreview();
+                    this.closeImportHtmlModal();
+                    document.getElementById('import-html-textarea').value = '';
+                    this.showToast(`已导入 ${validSteps.length} 个步骤，图片和文字已同步`);
+                } catch (err) {
+                    console.error('HTML 导入失败:', err);
+                    alert('HTML 导入失败，请检查代码是否完整。');
+                }
+            }
+
+            /**
+             * 优化后的复制函数：将所有重复样式抽取到 <style> 标签中，生成极短的 HTML 代码
+             */
+            buildStandaloneHtml() {
+                const s = this.styleConfig;
+
+                let css = `<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+.cg-wrap{width:100%;max-width:none;margin:0;padding:0;font-family:'Inter',sans-serif;display:flex;flex-direction:column;gap:${s.gap}px;box-sizing:border-box;overflow-x:hidden;}
+.cg-wrap,.cg-wrap *{box-sizing:border-box;}
+.cg-card{width:100%;max-width:100%;background:#fff;border-radius:${s.cardRadius};display:grid;grid-template-columns:minmax(0,calc(100% - var(--cg-img-width))) minmax(0,var(--cg-img-width));align-items:stretch;overflow:hidden;box-shadow:0 4px 6px -1px rgba(0,0,0,.1);border:1px solid #f1f5f9;--cg-img-width:${s.imageWidth}%;--cg-mobile-img-width:${s.mobileImageWidth}%;min-height:180px;height:auto;}
+.cg-body{width:auto;min-width:0;padding:${s.contentPadding}px;display:flex;flex-direction:column;box-sizing:border-box;overflow:hidden;}
+.cg-head{display:flex;align-items:center;gap:12px;margin-bottom:12px;width:100%;min-width:0;}
+.cg-badge{width:var(--cg-step-badge);height:var(--cg-step-badge);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;font-size:var(--cg-step-badge-font);}
+.cg-title{font-family:'Inter',sans-serif;font-size:var(--cg-step-title);font-weight:800;text-transform:uppercase;margin:0;line-height:1.3;word-break:break-word;overflow-wrap:break-word;white-space:pre-line;flex:1;min-width:0;}
+.cg-desc{font-family:'Inter',sans-serif;font-size:var(--cg-step-desc);margin:0;line-height:1.6;overflow-wrap:break-word;width:100%;}.cg-desc-line{display:inline;}
+.cg-imgbox{width:auto;min-width:0;min-height:100%;height:100%;position:relative;overflow:hidden;background:#f1f5f9;align-self:stretch;padding:0;margin:0;}
+.cg-img{position:absolute;left:0;top:0;right:0;bottom:0;width:100%;height:100%;min-width:100%;min-height:100%;object-fit:cover;object-position:center;display:block;max-width:none;}
+@media (max-width:640px){
+  html,body{width:100%;max-width:100%;margin:0;padding:0;overflow-x:hidden;-webkit-text-size-adjust:100%;}
+  .cg-wrap{width:100%;max-width:100%;padding:0;margin:0;gap:${Math.max(10, Math.min(s.gap, 14))}px;}
+  .cg-card{width:100%;height:auto !important;min-height:155px !important;display:grid !important;grid-template-columns:minmax(0,calc(100% - var(--cg-mobile-img-width))) minmax(0,var(--cg-mobile-img-width));}
+  .cg-body{padding:12px !important;min-width:0;}
+  .cg-head{gap:8px;margin-bottom:7px;}
+  .cg-title{font-family:'Inter',sans-serif;font-size:var(--cg-step-title) !important;line-height:1.18 !important;letter-spacing:0;}
+  .cg-desc{font-family:'Inter',sans-serif;font-size:var(--cg-step-desc) !important;line-height:1.38 !important;}
+  .cg-imgbox{min-width:0;min-height:100% !important;width:auto;height:100%;padding:0;margin:0;}
+}
+@media (max-width:380px){
+  .cg-body{padding:10px !important;}
+  .cg-title{font-family:'Inter',sans-serif;font-size:var(--cg-step-title) !important;}
+  .cg-desc{font-family:'Inter',sans-serif;font-size:var(--cg-step-desc) !important;}
+}
+</style>\n`;
+
+                let htmlOut = `${css}<div class="cg-wrap">\n`;
+
+                this.steps.forEach(step => {
+                    if (step.customHtml && step.customHtml.trim() !== '') {
+                        htmlOut += `${step.customHtml.trim()}\n`;
+                    } else {
+                        const badgeBg = step.badgeBg || s.badgeBg;
+                        const badgeText = step.badgeText || s.badgeText;
+                        const descLines = this.getDescLines(step);
+                        const formattedDesc = descLines.map((line) =>
+                            `<span class="cg-desc-line" style="font-size:${line.size}px;">${escapeHtml(line.text) || '&nbsp;'}</span>`
+                        ).join('<br>');
+                        const scale = (step.imgScale || 100) / 100;
+                        const posX = step.imgPosX || 0;
+                        const posY = step.imgPosY || 0;
+                        const cardHeight = step.height ? ` style="--cg-card-min-height:${step.height}px;"` : '';
+
+                        htmlOut += `<div class="cg-card" style="${step.height ? `--cg-card-min-height:${step.height}px;` : ""}--cg-step-title:${step.titleSize || s.titleSize}px;--cg-step-desc:${step.descSize || s.descSize}px;--cg-step-badge:${step.badgeSize || s.badgeSize}px;--cg-step-badge-font:${step.badgeFontSize || s.badgeFontSize}px;">`;
+                        htmlOut += `<div class="cg-body">`;
+                        htmlOut += `<div class="cg-head">`;
+                        htmlOut += `<div class="cg-badge" style="background:${badgeBg};color:${badgeText};">${step.number}</div>`;
+                        htmlOut += `<h3 class="cg-title" style="color:${step.textColor || '#1e293b'};">${escapeHtml(step.title).replace(/\n/g, "<br>")}</h3>`;
+                        htmlOut += `</div>`;
+                        htmlOut += `<p class="cg-desc" style="color:${step.descColor || '#475569'};">${formattedDesc}</p>`;
+                        htmlOut += `</div>`;
+                        htmlOut += `<div class="cg-imgbox">`;
+                        htmlOut += `<img class="cg-img" src="${step.image}" alt="${escapeHtml(step.title)}" style="transform:translate(${posX}px,${posY}px) scale(${scale});" />`;
+                        htmlOut += `</div>`;
+                        htmlOut += `</div>\n`;
+                    }
+                });
+
+                htmlOut += `</div>`;
+                return htmlOut;
+            }
+
+            copyHtmlCode() {
+                let htmlOut;
+                try {
+                    htmlOut = this.buildStandaloneHtml();
+                } catch (err) {
+                    console.error("生成 HTML 失败:", err);
+                    this.showToast("生成 HTML 失败，请检查步骤设置");
+                    return;
+                }
+
+                // 优先使用现代 Clipboard API；本地 HTML / 非安全环境自动降级。
+                if (navigator.clipboard && window.isSecureContext) {
+                    navigator.clipboard.writeText(htmlOut)
+                        .then(() => this.showToast("已复制独立 HTML 代码！"))
+                        .catch(() => this.fallbackCopyHtml(htmlOut));
+                } else {
+                    this.fallbackCopyHtml(htmlOut);
+                }
+            }
+
+            fallbackCopyHtml(text) {
+                const textarea = document.createElement("textarea");
+                textarea.value = text;
+                textarea.setAttribute("readonly", "");
+                textarea.style.position = "fixed";
+                textarea.style.left = "-999999px";
+                textarea.style.top = "0";
+                textarea.style.width = "1px";
+                textarea.style.height = "1px";
+                textarea.style.opacity = "0";
+                document.body.appendChild(textarea);
+
+                textarea.focus();
+                textarea.select();
+                textarea.setSelectionRange(0, textarea.value.length);
+
+                let success = false;
+                try {
+                    success = document.execCommand("copy");
+                } catch (err) {
+                    console.error("传统复制失败:", err);
+                }
+
+                document.body.removeChild(textarea);
+
+                if (success) {
+                    this.showToast("已复制独立 HTML 代码！");
+                } else {
+                    this.showCopyFallbackModal(text);
+                }
+            }
+
+            showCopyFallbackModal(text) {
+                let modal = document.getElementById("copy-fallback-modal");
+                if (!modal) {
+                    modal = document.createElement("div");
+                    modal.id = "copy-fallback-modal";
+                    modal.className = "fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[80] flex items-center justify-center p-4";
+                    modal.innerHTML = `
+                        <div class="bg-white rounded-2xl max-w-3xl w-full p-5 shadow-2xl border border-slate-200 space-y-3">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <h3 class="font-bold text-slate-900 text-sm">复制 HTML 代码</h3>
+                                    <p class="text-[11px] text-slate-500 mt-1">自动复制被浏览器阻止了，请点击下方代码框后按 Ctrl+C，手机端长按选择并复制。</p>
+                                </div>
+                                <button type="button" data-copy-close class="text-slate-400 hover:text-slate-600 text-lg px-2">×</button>
+                            </div>
+                            <textarea data-copy-fallback-textarea rows="18" spellcheck="false" class="w-full text-xs font-mono bg-slate-50 border border-slate-300 rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+                            <div class="flex justify-end gap-2">
+                                <button type="button" data-copy-select class="px-4 py-2 text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-lg">全选代码</button>
+                                <button type="button" data-copy-close class="px-4 py-2 text-xs font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg">关闭</button>
+                            </div>
+                        </div>`;
+                    document.body.appendChild(modal);
+                    modal.querySelectorAll("[data-copy-close]").forEach(btn => {
+                        btn.addEventListener("click", () => modal.remove());
+                    });
+                    modal.querySelector("[data-copy-select]").addEventListener("click", () => {
+                        const ta = modal.querySelector("[data-copy-fallback-textarea]");
+                        ta.focus();
+                        ta.select();
+                        ta.setSelectionRange(0, ta.value.length);
+                    });
+                }
+
+                const textarea = modal.querySelector("[data-copy-fallback-textarea]");
+                textarea.value = text;
+                modal.classList.remove("hidden");
+                setTimeout(() => {
+                    textarea.focus();
+                    textarea.select();
+                    textarea.setSelectionRange(0, textarea.value.length);
+                }, 50);
+            }
+
+            openPhonePreview() {
+                const modal = document.getElementById('phone-preview-modal');
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                this.updatePhonePreview();
+            }
+
+            closePhonePreview() {
+                const modal = document.getElementById('phone-preview-modal');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+
+            changePhonePreviewWidth() {
+                const width = parseInt(document.getElementById('phone-preview-width').value, 10) || 375;
+                const frame = document.getElementById('phone-device-frame');
+                frame.style.width = `${Math.min(width, 430)}px`;
+                this.updatePhonePreview();
+            }
+
+            updatePhonePreview() {
+                const modal = document.getElementById('phone-preview-modal');
+                if (modal.classList.contains('hidden')) return;
+                const iframe = document.getElementById('phone-preview-iframe');
+                if (!iframe) return;
+                iframe.srcdoc = this.buildStandaloneHtml();
+            }
+
+            exportImage() {
+
+                const node = document.getElementById('guide-preview-wrapper');
+                const btn = document.getElementById('export-btn');
+                btn.disabled = true;
+                btn.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> 正在生成...`;
+
+                html2canvas(node, {
+                    useCORS: true,
+                    scale: 2,
+                    backgroundColor: null
+                }).then(canvas => {
+                    const link = document.createElement('a');
+                    link.download = 'check-in-guide.png';
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fa-solid fa-download"></i><span>下载卡片图片</span>`;
+                    this.showToast("图片生成完成，已开始下载");
+                }).catch(err => {
+                    console.error(err);
+                    btn.disabled = false;
+                    btn.innerHTML = `<i class="fa-solid fa-download"></i><span>下载卡片图片</span>`;
+                    alert("图片导出失败，请检查是否使用了跨域限制的图片链接。");
+                });
+            }
+
+            showToast(message) {
+                const toast = document.getElementById('toast');
+                document.getElementById('toast-message').innerText = message;
+                toast.classList.remove('opacity-0', 'pointer-events-none');
+                setTimeout(() => {
+                    toast.classList.add('opacity-0', 'pointer-events-none');
+                }, 2500);
+            }
+        }
+
+        // 初始化全局变量
+        let app;
+        window.addEventListener('DOMContentLoaded', () => {
+            app = new GuideBuilder();
+        });
+    </script>
+</body>
+</html>
